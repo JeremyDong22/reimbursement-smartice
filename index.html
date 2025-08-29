@@ -1028,17 +1028,16 @@
                 `;
             });
 
-            // Grand total
+            // Grand total - should be inside tbody
             const grandTotal = totalRMB + (totalUSD * exchangeRate);
             html += `
-                <tr class="grand-total">
-                    <td colspan="6">TOTAL REIMBURSEMENT AMOUNT</td>
-                    <td class="amount" style="font-size: 18px;">¥${grandTotal.toFixed(2)}</td>
-                    <td></td>
-                </tr>
-            `;
-
-            html += '</tbody></table>';
+                    <tr class="grand-total">
+                        <td colspan="6">TOTAL REIMBURSEMENT AMOUNT</td>
+                        <td class="amount" style="font-size: 18px;">¥${grandTotal.toFixed(2)}</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>`;
             document.getElementById('currentTableContent').innerHTML = html;
             
             // Add click event listeners to all category headers after rendering
@@ -1124,7 +1123,9 @@
                 `;
             });
 
-            html += '</tbody></table>';
+            html += `
+                </tbody>
+            </table>`;
             document.getElementById('historyTableContent').innerHTML = html;
             
             // Add click event listeners to all payment cycle headers after rendering
