@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Installation Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0f0f0f;
+            color: #e0e0e0;
+        }
+        .card {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #2a2a2a;
+        }
+        h1 {
+            color: #4a9eff;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .success { background: #4ade80; }
+        .error { background: #dc2626; }
+        .warning { background: #fbbf24; }
+        .pending { background: #666; }
+        button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2e7dd2;
+        }
+        .install-btn {
+            background: #4ade80;
+            padding: 15px 30px;
+            font-size: 18px;
+            display: none;
+        }
+        .install-btn:hover {
+            background: #22c55e;
+        }
+        pre {
+            background: #242424;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .instructions {
+            background: #242424;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .instructions h3 {
+            color: #4ade80;
+            margin-top: 0;
+        }
+        .instructions ol {
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <h1>PWA Installation Test</h1>
+
+    <div class="card">
+        <h2>Status Checks</h2>
+        
+        <div class="status">
+            <div class="indicator" id="https-indicator"></div>
+            <span>HTTPS/localhost (Required for PWA)</span>
+        </div>
+        
+        <div class="status">
+            <div class="indicator" id="manifest-indicator"></div>
+            <span>Manifest file</span>
+        </div>
+        
+        <div class="status">
+            <div class="indicator" id="sw-indicator"></div>
+            <span>Service Worker</span>
+        </div>
+        
+        <div class="status">
+            <div class="indicator" id="installable-indicator"></div>
+            <span>Installable</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Quick Actions</h2>
+        <button onclick="window.open('index.html', '_blank')">Open App</button>
+        <button onclick="checkStatus()">Refresh Status</button>
+        <button onclick="unregisterSW()">Unregister Service Worker</button>
+        <button class="install-btn" id="installBtn" onclick="installPWA()">Install App</button>
+    </div>
+
+    <div class="card instructions">
+        <h3>How to Install the PWA</h3>
+        
+        <h4>Method 1: Using a Local Server (Recommended)</h4>
+        <ol>
+            <li>Install a simple HTTP server:
+                <pre>npm install -g http-server</pre>
+                or
+                <pre>python3 -m pip install --user http-server</pre>
+            </li>
+            <li>Navigate to your project directory:
+                <pre>cd /Users/jeremydong/Desktop/Smartice/ReimbersementAPPofJeremy</pre>
+            </li>
+            <li>Start the server:
+                <pre>http-server -p 8080</pre>
+                or with Python:
+                <pre>python3 -m http.server 8080</pre>
+            </li>
+            <li>Open in browser: <a href="http://localhost:8080" target="_blank">http://localhost:8080</a></li>
+            <li>Look for the install icon in the address bar (usually appears after a few seconds)</li>
+        </ol>
+
+        <h4>Method 2: Deploy to GitHub Pages</h4>
+        <ol>
+            <li>Create a GitHub repository</li>
+            <li>Push your files to the repository</li>
+            <li>Enable GitHub Pages in repository settings</li>
+            <li>Access via: https://[username].github.io/[repository-name]</li>
+        </ol>
+
+        <h4>Method 3: Deploy to Vercel/Netlify (Easiest)</h4>
+        <ol>
+            <li>Go to <a href="https://vercel.com" target="_blank">Vercel</a> or <a href="https://netlify.com" target="_blank">Netlify</a></li>
+            <li>Drag and drop your project folder</li>
+            <li>Get instant HTTPS URL</li>
+            <li>Visit the URL and install the PWA</li>
+        </ol>
+
+        <h4>Installation on Different Devices</h4>
+        <ul>
+            <li><strong>Desktop Chrome:</strong> Look for install icon in address bar or menu (⋮) → "Install App"</li>
+            <li><strong>Mobile Chrome:</strong> Menu (⋮) → "Add to Home Screen"</li>
+            <li><strong>Safari iOS:</strong> Share button → "Add to Home Screen"</li>
+            <li><strong>Edge:</strong> Settings menu → "Apps" → "Install this site as an app"</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>Console Output</h2>
+        <pre id="console-output">Checking PWA status...</pre>
+    </div>
+
+    <script>
+        let deferredPrompt;
+        const output = document.getElementById('console-output');
+        
+        function log(message) {
+            output.textContent += '\n' + message;
+        }
+
+        function setIndicator(id, status) {
+            const indicator = document.getElementById(id);
+            indicator.className = 'indicator ' + status;
+        }
+
+        async function checkStatus() {
+            output.textContent = 'Checking PWA status...';
+            
+            // Check HTTPS/localhost
+            const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            setIndicator('https-indicator', isSecure ? 'success' : 'error');
+            log(`Secure context: ${isSecure ? 'Yes' : 'No (PWA requires HTTPS or localhost)'}`);
+            
+            // Check manifest
+            try {
+                const manifestLink = document.querySelector('link[rel="manifest"]');
+                if (manifestLink) {
+                    const response = await fetch(manifestLink.href);
+                    const manifest = await response.json();
+                    setIndicator('manifest-indicator', 'success');
+                    log(`Manifest found: ${manifest.name}`);
+                } else {
+                    setIndicator('manifest-indicator', 'error');
+                    log('No manifest link found');
+                }
+            } catch (e) {
+                setIndicator('manifest-indicator', 'error');
+                log('Manifest error: ' + e.message);
+            }
+            
+            // Check service worker
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                if (registrations.length > 0) {
+                    setIndicator('sw-indicator', 'success');
+                    log(`Service Worker registered: ${registrations.length} registration(s)`);
+                } else {
+                    setIndicator('sw-indicator', 'warning');
+                    log('No Service Worker registered');
+                }
+            } else {
+                setIndicator('sw-indicator', 'error');
+                log('Service Worker not supported');
+            }
+            
+            // Check installability
+            if (deferredPrompt) {
+                setIndicator('installable-indicator', 'success');
+                document.getElementById('installBtn').style.display = 'inline-block';
+                log('App is installable!');
+            } else {
+                setIndicator('installable-indicator', 'pending');
+                log('App not yet installable (may already be installed or needs HTTPS)');
+            }
+        }
+
+        async function unregisterSW() {
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister();
+                }
+                log('Service Workers unregistered');
+                checkStatus();
+            }
+        }
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        log('PWA installed successfully!');
+                    } else {
+                        log('PWA installation cancelled');
+                    }
+                    deferredPrompt = null;
+                    document.getElementById('installBtn').style.display = 'none';
+                });
+            }
+        }
+
+        // Listen for install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            setIndicator('installable-indicator', 'success');
+            document.getElementById('installBtn').style.display = 'inline-block';
+            log('Install prompt ready!');
+        });
+
+        // Check on load
+        window.addEventListener('load', () => {
+            // Add manifest link
+            if (!document.querySelector('link[rel="manifest"]')) {
+                const link = document.createElement('link');
+                link.rel = 'manifest';
+                link.href = 'manifest.json';
+                document.head.appendChild(link);
+            }
+            
+            checkStatus();
+        });
+    </script>
+</body>
+</html>

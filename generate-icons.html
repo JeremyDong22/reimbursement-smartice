@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate PWA Icons from Image</title>
+    <style>
+        body {
+            font-family: system-ui;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .icon-box {
+            background: #242424;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        canvas {
+            background: white;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #4ade80;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 20px 5px;
+        }
+        button:hover {
+            background: #22c55e;
+        }
+        .instructions {
+            background: #242424;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1 { color: #4a9eff; }
+        .filename { 
+            color: #888; 
+            font-size: 12px; 
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generate PWA Icons from Your Image</h1>
+    
+    <div class="instructions">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>The image has been loaded automatically</li>
+            <li>Click "Generate All Icons" to create all required sizes</li>
+            <li>Click "Download All" to save them to your icons folder</li>
+            <li>Or right-click each canvas and save individually</li>
+        </ol>
+    </div>
+
+    <div>
+        <button onclick="generateAllIcons()">Generate All Icons</button>
+        <button onclick="downloadAll()">Download All</button>
+    </div>
+
+    <div class="grid" id="iconGrid">
+        <!-- Icons will be generated here -->
+    </div>
+
+    <script>
+        const sizes = [16, 32, 72, 96, 128, 144, 152, 192, 384, 512];
+        const imagePath = 'Gemini_Generated_Image_6hmjan6hmjan6hmj.png';
+        let generatedIcons = {};
+
+        // Create canvas elements
+        function setupCanvases() {
+            const grid = document.getElementById('iconGrid');
+            sizes.forEach(size => {
+                const box = document.createElement('div');
+                box.className = 'icon-box';
+                
+                const canvas = document.createElement('canvas');
+                canvas.id = `icon-${size}`;
+                canvas.width = size;
+                canvas.height = size;
+                
+                const label = document.createElement('div');
+                label.className = 'filename';
+                label.textContent = `icon-${size}x${size}.png`;
+                
+                box.appendChild(canvas);
+                box.appendChild(label);
+                grid.appendChild(box);
+            });
+        }
+
+        // Generate icons from the source image
+        function generateAllIcons() {
+            const img = new Image();
+            img.onload = function() {
+                sizes.forEach(size => {
+                    const canvas = document.getElementById(`icon-${size}`);
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Clear canvas
+                    ctx.clearRect(0, 0, size, size);
+                    
+                    // Draw the image scaled to fit
+                    ctx.drawImage(img, 0, 0, size, size);
+                    
+                    // Store for download
+                    generatedIcons[size] = canvas;
+                });
+                
+                console.log('All icons generated successfully!');
+            };
+            img.onerror = function() {
+                alert('Error loading image. Make sure the image file exists.');
+            };
+            img.src = imagePath;
+        }
+
+        // Download all icons
+        function downloadAll() {
+            if (Object.keys(generatedIcons).length === 0) {
+                alert('Please generate icons first!');
+                return;
+            }
+            
+            Object.keys(generatedIcons).forEach(size => {
+                const canvas = generatedIcons[size];
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `icon-${size}x${size}.png`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            });
+        }
+
+        // Initialize
+        window.onload = function() {
+            setupCanvases();
+            // Auto-generate on load
+            setTimeout(generateAllIcons, 500);
+        };
+    </script>
+</body>
+</html>

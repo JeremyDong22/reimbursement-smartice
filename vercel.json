@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "name": "reimbursement-smartice",
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/service-worker.js",
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate",
+        "service-worker-allowed": "/"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block"
+      }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
