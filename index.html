@@ -211,12 +211,8 @@
             margin-right: 5px;
         }
         
-        .category-content {
-            transition: all 0.3s ease;
-        }
-        
-        .category-content.hidden {
-            display: none;
+        .category-row, .cycle-row {
+            transition: opacity 0.3s ease;
         }
         
         .subtotal td {
@@ -262,13 +258,6 @@
             margin-right: 5px;
         }
         
-        .payment-cycle-content {
-            transition: all 0.3s ease;
-        }
-        
-        .payment-cycle-content.hidden {
-            display: none;
-        }
         
         .amount {
             text-align: right;
@@ -970,17 +959,16 @@
             let totalUSD = 0;
 
             Object.keys(categories).sort().forEach((category, index) => {
-                // Category header with onclick handler
-                const categoryId = `category-${index}`;
-                html += `<tr class="category-header" onclick="toggleCategory('${categoryId}')"><td colspan="8">${category}</td></tr>`;
+                // Category header with data attribute for category identification
+                const safeCategoryId = category.replace(/[^a-zA-Z0-9]/g, '-');
+                html += `<tr class="category-header" data-category-id="${safeCategoryId}"><td colspan="8">${category}</td></tr>`;
 
                 let categoryTotal = 0;
-                let categoryRows = '';
                 
                 categories[category].forEach(expense => {
                     const rmbValue = parseFloat(expense.rmb_value);
-                    categoryRows += `
-                        <tr id="row-${expense.id}" data-expense='${JSON.stringify(expense).replace(/'/g, "&#39;")}'>
+                    html += `
+                        <tr class="category-row ${safeCategoryId}" id="row-${expense.id}" data-expense='${JSON.stringify(expense).replace(/'/g, "&#39;")}'>
                             <td>
                                 <div id="actions-${expense.id}">
                                     <button class="edit-btn" onclick="editExpense(${expense.id})">Edit</button>
@@ -1003,18 +991,15 @@
                         totalRMB += parseFloat(expense.amount);
                     }
                 });
-
-                // Wrap category content in a tbody with class for toggling
-                html += `<tbody class="category-content" id="${categoryId}">${categoryRows}`;
                 
                 // Category subtotal
                 html += `
-                    <tr class="subtotal">
+                    <tr class="subtotal ${safeCategoryId}">
                         <td colspan="6">Category Subtotal</td>
                         <td class="amount">${categoryTotal.toFixed(2)}</td>
                         <td></td>
                     </tr>
-                </tbody>`;
+                `;
             });
 
             // Grand total
@@ -1029,6 +1014,15 @@
 
             html += '</tbody></table>';
             document.getElementById('currentTableContent').innerHTML = html;
+            
+            // Add click event listeners to all category headers after rendering
+            document.querySelectorAll('.category-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const categoryId = this.getAttribute('data-category-id');
+                    toggleCategory(categoryId, this);
+                });
+            });
+            
             updateSummary(totalRMB, totalUSD);
         }
 
@@ -1074,16 +1068,15 @@
             });
 
             Object.keys(paymentCycles).forEach((paidDate, index) => {
-                const cycleId = `payment-cycle-${index}`;
-                html += `<tr><td colspan="7" class="payment-cycle-header" onclick="togglePaymentCycle('${cycleId}')">💰 Paid on: ${paidDate}</td></tr>`;
+                const safeCycleId = `cycle-${index}`;
+                html += `<tr><td colspan="7" class="payment-cycle-header" data-cycle-id="${safeCycleId}">💰 Paid on: ${paidDate}</td></tr>`;
 
                 let cycleTotal = 0;
-                let cycleRows = '';
                 
                 paymentCycles[paidDate].forEach(expense => {
                     const rmbValue = parseFloat(expense.rmb_value);
-                    cycleRows += `
-                        <tr>
+                    html += `
+                        <tr class="cycle-row ${safeCycleId}">
                             <td>${new Date(expense.date).toLocaleDateString()}</td>
                             <td>${expense.category}</td>
                             <td>${expense.name}</td>
@@ -1095,21 +1088,26 @@
                     `;
                     cycleTotal += rmbValue;
                 });
-
-                // Wrap payment cycle content in a tbody with class for toggling
-                html += `<tbody class="payment-cycle-content" id="${cycleId}">${cycleRows}`;
                 
                 html += `
-                    <tr class="subtotal">
+                    <tr class="subtotal ${safeCycleId}">
                         <td colspan="5">Cycle Total</td>
                         <td class="amount">¥${cycleTotal.toFixed(2)}</td>
                         <td></td>
                     </tr>
-                </tbody>`;
+                `;
             });
 
             html += '</tbody></table>';
             document.getElementById('historyTableContent').innerHTML = html;
+            
+            // Add click event listeners to all payment cycle headers after rendering
+            document.querySelectorAll('.payment-cycle-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const cycleId = this.getAttribute('data-cycle-id');
+                    togglePaymentCycle(cycleId, this);
+                });
+            });
         }
 
         // Update summary
@@ -1402,30 +1400,30 @@
         }
 
         // Toggle category visibility
-        function toggleCategory(categoryId) {
-            const categoryContent = document.getElementById(categoryId);
-            const categoryHeader = categoryContent.previousElementSibling;
+        function toggleCategory(categoryId, headerElement) {
+            const categoryRows = document.querySelectorAll(`.category-row.${categoryId}, .subtotal.${categoryId}`);
+            const isCollapsed = headerElement.classList.contains('collapsed');
             
-            if (categoryContent.classList.contains('hidden')) {
-                categoryContent.classList.remove('hidden');
-                categoryHeader.classList.remove('collapsed');
+            if (isCollapsed) {
+                categoryRows.forEach(row => row.style.display = '');
+                headerElement.classList.remove('collapsed');
             } else {
-                categoryContent.classList.add('hidden');
-                categoryHeader.classList.add('collapsed');
+                categoryRows.forEach(row => row.style.display = 'none');
+                headerElement.classList.add('collapsed');
             }
         }
         
         // Toggle payment cycle visibility
-        function togglePaymentCycle(cycleId) {
-            const cycleContent = document.getElementById(cycleId);
-            const cycleHeader = cycleContent.previousElementSibling.querySelector('.payment-cycle-header');
+        function togglePaymentCycle(cycleId, headerElement) {
+            const cycleRows = document.querySelectorAll(`.cycle-row.${cycleId}, .subtotal.${cycleId}`);
+            const isCollapsed = headerElement.parentElement.querySelector('.payment-cycle-header').classList.contains('collapsed');
             
-            if (cycleContent.classList.contains('hidden')) {
-                cycleContent.classList.remove('hidden');
-                cycleHeader.classList.remove('collapsed');
+            if (isCollapsed) {
+                cycleRows.forEach(row => row.style.display = '');
+                headerElement.parentElement.querySelector('.payment-cycle-header').classList.remove('collapsed');
             } else {
-                cycleContent.classList.add('hidden');
-                cycleHeader.classList.add('collapsed');
+                cycleRows.forEach(row => row.style.display = 'none');
+                headerElement.parentElement.querySelector('.payment-cycle-header').classList.add('collapsed');
             }
         }
         
