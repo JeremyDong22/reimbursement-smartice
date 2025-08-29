@@ -388,6 +388,31 @@
             box-shadow: 0 6px 20px rgba(74, 222, 128, 0.6);
         }
         
+        .fab-refresh {
+            position: fixed;
+            bottom: 30px;
+            right: 100px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+            z-index: 100;
+            border: none;
+            color: white;
+            font-size: 22px;
+        }
+        
+        .fab-refresh:hover {
+            transform: scale(1.1) rotate(180deg);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -734,7 +759,8 @@
         </div>
     </div>
 
-    <!-- Floating Action Button -->
+    <!-- Floating Action Buttons -->
+    <button class="fab-refresh" id="refreshBtn" onclick="refreshPage()" title="Refresh Data">↻</button>
     <button class="fab" id="addBtn" onclick="openAddModal()">+</button>
 
     <!-- Add Expense Modal -->
@@ -1131,31 +1157,46 @@
                 document.getElementById('currentView').style.display = 'block';
                 document.getElementById('historyView').style.display = 'none';
                 document.getElementById('addBtn').style.display = 'flex';
+                document.getElementById('refreshBtn').style.display = 'flex';
             } else {
                 document.getElementById('currentView').style.display = 'none';
                 document.getElementById('historyView').style.display = 'block';
                 document.getElementById('addBtn').style.display = 'none';
+                document.getElementById('refreshBtn').style.display = 'none';
             }
         }
 
-        // Add expense
+        // Add expense with better error handling
         async function addExpense() {
-            const name = document.getElementById('expenseName').value;
+            const name = document.getElementById('expenseName').value.trim();
             const category = document.getElementById('expenseCategory').value;
             const amount = parseFloat(document.getElementById('expenseAmount').value);
             const currency = document.getElementById('expenseCurrency').value;
             const date = document.getElementById('expenseDate').value;
-            const comment = document.getElementById('expenseComment').value;
+            const comment = document.getElementById('expenseComment').value.trim();
 
             if (!name || !category || !amount || !currency || !date) {
                 alert('Please fill in all required fields');
                 return;
             }
 
+            if (isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid amount greater than 0');
+                return;
+            }
+
             const rmbValue = currency === 'USD' ? amount * exchangeRate : amount;
 
+            // Show loading state
+            const addButton = document.querySelector('.btn-primary');
+            const originalText = addButton.textContent;
+            addButton.textContent = 'Adding...';
+            addButton.disabled = true;
+
             try {
-                const { error } = await supabase
+                console.log('Adding expense:', { name, category, amount, currency, date, comment });
+                
+                const { data, error } = await supabase
                     .from('jeremy_reimbursement')
                     .insert([{
                         name,
@@ -1166,16 +1207,34 @@
                         date,
                         comment,
                         is_paid_off: false
-                    }]);
+                    }])
+                    .select();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase error:', error);
+                    throw error;
+                }
 
+                console.log('Expense added successfully:', data);
+                
+                // Success - close modal and refresh
                 closeAddModal();
                 document.getElementById('expenseForm').reset();
                 document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
-                loadCurrentExpenses();
+                
+                // Force refresh of data
+                await loadCurrentExpenses();
+                
+                // Show success message
+                showNotification('Expense added successfully!', 'success');
+                
             } catch (error) {
-                alert('Error adding expense: ' + error.message);
+                console.error('Error adding expense:', error);
+                alert('Error adding expense: ' + (error.message || 'Unknown error occurred'));
+            } finally {
+                // Reset button state
+                addButton.textContent = originalText;
+                addButton.disabled = false;
             }
         }
 
@@ -1426,6 +1485,75 @@
                 headerElement.parentElement.querySelector('.payment-cycle-header').classList.add('collapsed');
             }
         }
+        
+        // Refresh page function
+        function refreshPage() {
+            console.log('Refreshing data...');
+            showNotification('Refreshing...', 'info');
+            
+            // Reload all data
+            Promise.all([
+                fetchExchangeRate(),
+                loadCurrentExpenses(),
+                loadHistoryExpenses()
+            ]).then(() => {
+                showNotification('Data refreshed!', 'success');
+            }).catch(error => {
+                console.error('Error refreshing:', error);
+                showNotification('Error refreshing data', 'error');
+            });
+        }
+        
+        // Show notification function
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+            
+            // Set background color based on type
+            const colors = {
+                success: 'linear-gradient(135deg, #10b981, #059669)',
+                error: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                info: 'linear-gradient(135deg, #3b82f6, #2563eb)'
+            };
+            notification.style.background = colors[type] || colors.info;
+            notification.textContent = message;
+            
+            // Add to page
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // Add animation styles
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
         
         // Update amount preview
         document.getElementById('expenseAmount').addEventListener('input', updateRMBPreview);
