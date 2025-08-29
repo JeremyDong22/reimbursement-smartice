@@ -11,7 +11,7 @@ import os
 sizes = [16, 32, 72, 96, 128, 144, 152, 192, 384, 512]
 
 # Source image
-source_image = "Gemini_Generated_Image_6hmjan6hmjan6hmj.png"
+source_image = "Gemini_Generated_Image_its151its151its1.png"
 
 # Create icons directory if it doesn't exist
 os.makedirs("icons", exist_ok=True)

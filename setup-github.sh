@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# GitHub Repository Setup Script
+# Run this script to push your code to GitHub
+
+echo "GitHub Repository Setup for Reimbursement Smartice"
+echo "=================================================="
+echo ""
+echo "Please follow these steps:"
+echo ""
+echo "1. First, create a new repository on GitHub:"
+echo "   - Go to: https://github.com/new"
+echo "   - Repository name: reimbursement-smartice"
+echo "   - Description: PWA for tracking and managing expense reimbursements"
+echo "   - Keep it Public"
+echo "   - DO NOT initialize with README (we already have one)"
+echo ""
+echo "2. After creating the repository, run these commands:"
+echo ""
+echo "git remote add origin https://github.com/YOUR_USERNAME/reimbursement-smartice.git"
+echo "git branch -M main"
+echo "git push -u origin main"
+echo ""
+echo "3. For Vercel deployment:"
+echo "   - Go to: https://vercel.com/new"
+echo "   - Import your GitHub repository"
+echo "   - Vercel will auto-detect the configuration"
+echo "   - Click Deploy"
+echo ""
+echo "Your repository is ready to push!"
