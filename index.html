@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeremy's Reimbursement Tracker</title>
+    <title>Payoff Reimbursement Tracker</title>
     
     <!-- PWA Meta Tags -->
     <meta name="description" content="Track and manage expense reimbursements with real-time sync">
@@ -679,8 +679,12 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>💼 Jeremy's Reimbursement Tracker</h1>
+            <h1>💼 Payoff Reimbursement Tracker</h1>
             <div class="subtitle">Powered by Supabase • Real-time Sync</div>
+            <div style="position: absolute; top: 20px; right: 20px;">
+                <span style="color: #4a9eff; margin-right: 10px;" id="currentUser">Loading...</span>
+                <button onclick="logout()" style="background: #dc2626; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 12px;">Logout</button>
+            </div>
         </div>
         
         <div class="tabs">
@@ -814,6 +818,12 @@
                     <textarea class="form-textarea" id="expenseComment" placeholder="Optional notes about this expense"></textarea>
                 </div>
                 
+                <div class="form-group">
+                    <label class="form-label">Upload Credential (Optional)</label>
+                    <input type="file" class="form-input" id="expenseCredential" accept="image/*,.pdf" style="padding: 8px;">
+                    <small style="color: #888; font-size: 11px;">Supported: JPG, PNG, GIF, PDF (Max 5MB)</small>
+                </div>
+                
                 <div class="form-group" id="rmbPreview" style="display: none;">
                     <label class="form-label">RMB Value (Auto-calculated)</label>
                     <div style="color: #4ade80; font-size: 18px; font-weight: 600;" id="rmbPreviewValue">¥0.00</div>
@@ -838,9 +848,24 @@
         let historyExpenses = [];
         let exchangeRate = 7.179186;
         let currentTab = 'current';
+        let currentUserId = null;
+        let currentUsername = null;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            // Check authentication
+            currentUserId = localStorage.getItem('payoff_user_id');
+            currentUsername = localStorage.getItem('payoff_username');
+            
+            if (!currentUserId || !currentUsername) {
+                // Not logged in, redirect to login page
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Display current user
+            document.getElementById('currentUser').textContent = `👤 ${currentUsername}`;
+            
             setToday();
             fetchExchangeRate();
             loadCurrentExpenses();
@@ -903,9 +928,10 @@
         async function loadCurrentExpenses() {
             try {
                 const { data, error } = await supabase
-                    .from('jeremy_reimbursement')
+                    .from('payoff_reimbursements')
                     .select('*')
                     .eq('is_paid_off', false)
+                    .eq('user_id', currentUserId)
                     .order('date', { ascending: false });
 
                 if (error) throw error;
@@ -928,9 +954,10 @@
         async function loadHistoryExpenses() {
             try {
                 const { data, error } = await supabase
-                    .from('jeremy_reimbursement')
+                    .from('payoff_reimbursements')
                     .select('*')
                     .eq('is_paid_off', true)
+                    .eq('user_id', currentUserId)
                     .order('paid_off_date', { ascending: false });
 
                 if (error) throw error;
@@ -960,13 +987,14 @@
                     <thead>
                         <tr>
                             <th style="width: 5%;">Action</th>
-                            <th style="width: 10%;">Date</th>
-                            <th style="width: 15%;">Category</th>
-                            <th style="width: 20%;">Name</th>
-                            <th style="width: 12%;">Amount</th>
-                            <th style="width: 8%;">Currency</th>
-                            <th style="width: 12%;">RMB Value</th>
-                            <th style="width: 18%;">Comment</th>
+                            <th style="width: 8%;">Date</th>
+                            <th style="width: 12%;">Category</th>
+                            <th style="width: 18%;">Name</th>
+                            <th style="width: 10%;">Amount</th>
+                            <th style="width: 6%;">Currency</th>
+                            <th style="width: 10%;">RMB Value</th>
+                            <th style="width: 8%;">Credential</th>
+                            <th style="width: 15%;">Comment</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1006,6 +1034,7 @@
                             <td id="amount-${expense.id}" class="amount">${parseFloat(expense.amount).toFixed(2)}</td>
                             <td id="currency-${expense.id}">${expense.currency}</td>
                             <td id="rmb-${expense.id}" class="amount">${rmbValue.toFixed(2)}</td>
+                            <td id="credential-${expense.id}">${expense.credential_url ? `<a href="#" onclick="showCredential('${expense.credential_url}'); return false;" style="color: #4a9eff; text-decoration: none;">📎 View</a>` : '-'}</td>
                             <td id="comment-${expense.id}"><div class="comment-text" title="${expense.comment || ''}">${expense.comment || '-'}</div></td>
                         </tr>
                     `;
@@ -1024,6 +1053,7 @@
                         <td colspan="6">Category Subtotal</td>
                         <td class="amount">${categoryTotal.toFixed(2)}</td>
                         <td></td>
+                        <td></td>
                     </tr>
                 `;
             });
@@ -1034,6 +1064,7 @@
                     <tr class="grand-total">
                         <td colspan="6">TOTAL REIMBURSEMENT AMOUNT</td>
                         <td class="amount" style="font-size: 18px;">¥${grandTotal.toFixed(2)}</td>
+                        <td></td>
                         <td></td>
                     </tr>
                 </tbody>
@@ -1067,13 +1098,14 @@
                 <table>
                     <thead>
                         <tr>
-                            <th style="width: 10%;">Date</th>
-                            <th style="width: 15%;">Category</th>
-                            <th style="width: 25%;">Name</th>
-                            <th style="width: 12%;">Amount</th>
-                            <th style="width: 8%;">Currency</th>
-                            <th style="width: 12%;">RMB Value</th>
-                            <th style="width: 18%;">Comment</th>
+                            <th style="width: 8%;">Date</th>
+                            <th style="width: 12%;">Category</th>
+                            <th style="width: 20%;">Name</th>
+                            <th style="width: 10%;">Amount</th>
+                            <th style="width: 6%;">Currency</th>
+                            <th style="width: 10%;">RMB Value</th>
+                            <th style="width: 10%;">Credential</th>
+                            <th style="width: 14%;">Comment</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1108,6 +1140,7 @@
                             <td class="amount">${parseFloat(expense.amount).toFixed(2)}</td>
                             <td>${expense.currency}</td>
                             <td class="amount">${rmbValue.toFixed(2)}</td>
+                            <td>${expense.credential_url ? `<a href="#" onclick="showCredential('${expense.credential_url}'); return false;" style="color: #4a9eff; text-decoration: none;">📎 View</a>` : '-'}</td>
                             <td><div class="comment-text" title="${expense.comment || ''}">${expense.comment || '-'}</div></td>
                         </tr>
                     `;
@@ -1118,6 +1151,7 @@
                     <tr class="subtotal ${safeCycleId}">
                         <td colspan="5">Cycle Total</td>
                         <td class="amount">¥${cycleTotal.toFixed(2)}</td>
+                        <td></td>
                         <td></td>
                     </tr>
                 `;
@@ -1167,7 +1201,7 @@
             }
         }
 
-        // Add expense with better error handling
+        // Add expense with better error handling and credential upload
         async function addExpense() {
             const name = document.getElementById('expenseName').value.trim();
             const category = document.getElementById('expenseCategory').value;
@@ -1175,6 +1209,7 @@
             const currency = document.getElementById('expenseCurrency').value;
             const date = document.getElementById('expenseDate').value;
             const comment = document.getElementById('expenseComment').value.trim();
+            const credentialFile = document.getElementById('expenseCredential').files[0];
 
             if (!name || !category || !amount || !currency || !date) {
                 alert('Please fill in all required fields');
@@ -1195,10 +1230,39 @@
             addButton.disabled = true;
 
             try {
-                console.log('Adding expense:', { name, category, amount, currency, date, comment });
+                let credentialUrl = null;
+                
+                // Upload credential if provided
+                if (credentialFile) {
+                    if (credentialFile.size > 5 * 1024 * 1024) {
+                        alert('File size must be less than 5MB');
+                        return;
+                    }
+                    
+                    const fileExt = credentialFile.name.split('.').pop();
+                    const fileName = `${currentUsername}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('payoff_storage')
+                        .upload(fileName, credentialFile);
+                    
+                    if (uploadError) {
+                        console.error('Upload error:', uploadError);
+                        throw new Error('Failed to upload credential');
+                    }
+                    
+                    // Get public URL
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('payoff_storage')
+                        .getPublicUrl(fileName);
+                    
+                    credentialUrl = publicUrl;
+                }
+                
+                console.log('Adding expense:', { name, category, amount, currency, date, comment, credentialUrl });
                 
                 const { data, error } = await supabase
-                    .from('jeremy_reimbursement')
+                    .from('payoff_reimbursements')
                     .insert([{
                         name,
                         category,
@@ -1207,7 +1271,9 @@
                         rmb_value: rmbValue,
                         date,
                         comment,
-                        is_paid_off: false
+                        is_paid_off: false,
+                        user_id: currentUserId,
+                        credential_url: credentialUrl
                     }])
                     .select();
 
@@ -1256,6 +1322,8 @@
                 <button class="save-btn" onclick="saveEdit(${id})">Save</button>
                 <button class="cancel-btn" onclick="cancelEdit(${id})">Cancel</button>
                 <button class="delete-btn" onclick="deleteExpense(${id})">Delete</button>
+                <label for="upload-credential-${id}" style="background: #10b981; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px;">📎 Upload</label>
+                <input type="file" id="upload-credential-${id}" accept="image/*,.pdf" style="display: none;" onchange="uploadCredentialForExpense(${id})">
             `;
             
             // Make fields editable
@@ -1310,7 +1378,7 @@
             
             try {
                 const { error } = await supabase
-                    .from('jeremy_reimbursement')
+                    .from('payoff_reimbursements')
                     .update({
                         name,
                         amount,
@@ -1318,7 +1386,8 @@
                         rmb_value: rmbValue,
                         comment
                     })
-                    .eq('id', id);
+                    .eq('id', id)
+                    .eq('user_id', currentUserId);
                 
                 if (error) throw error;
                 
@@ -1339,9 +1408,10 @@
 
             try {
                 const { error } = await supabase
-                    .from('jeremy_reimbursement')
+                    .from('payoff_reimbursements')
                     .delete()
-                    .eq('id', id);
+                    .eq('id', id)
+                    .eq('user_id', currentUserId);
 
                 if (error) throw error;
 
@@ -1364,12 +1434,13 @@
 
             try {
                 const { error } = await supabase
-                    .from('jeremy_reimbursement')
+                    .from('payoff_reimbursements')
                     .update({ 
                         is_paid_off: true,
                         paid_off_date: new Date().toISOString()
                     })
-                    .eq('is_paid_off', false);
+                    .eq('is_paid_off', false)
+                    .eq('user_id', currentUserId);
 
                 if (error) throw error;
 
@@ -1558,6 +1629,141 @@
         
         // Update amount preview
         document.getElementById('expenseAmount').addEventListener('input', updateRMBPreview);
+        
+        // Logout function
+        function logout() {
+            localStorage.removeItem('payoff_user_id');
+            localStorage.removeItem('payoff_username');
+            window.location.href = 'login.html';
+        }
+        
+        // Upload credential for existing expense
+        async function uploadCredentialForExpense(id) {
+            const fileInput = document.getElementById(`upload-credential-${id}`);
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+            
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
+            }
+            
+            try {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${currentUsername}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                
+                // Upload to Supabase storage
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('payoff_storage')
+                    .upload(fileName, file);
+                
+                if (uploadError) {
+                    console.error('Upload error:', uploadError);
+                    throw new Error('Failed to upload credential');
+                }
+                
+                // Get public URL
+                const { data: { publicUrl } } = supabase.storage
+                    .from('payoff_storage')
+                    .getPublicUrl(fileName);
+                
+                // Update the expense record with credential URL
+                const { error: updateError } = await supabase
+                    .from('payoff_reimbursements')
+                    .update({ credential_url: publicUrl })
+                    .eq('id', id)
+                    .eq('user_id', currentUserId);
+                
+                if (updateError) {
+                    console.error('Update error:', updateError);
+                    throw new Error('Failed to update expense with credential');
+                }
+                
+                // Update the UI
+                const credentialCell = document.getElementById(`credential-${id}`);
+                if (credentialCell) {
+                    credentialCell.innerHTML = `<a href="#" onclick="showCredential('${publicUrl}'); return false;" style="color: #4a9eff; text-decoration: none;">📎 View</a>`;
+                }
+                
+                showNotification('Credential uploaded successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error uploading credential:', error);
+                alert('Error uploading credential: ' + error.message);
+            }
+        }
+        
+        // Show credential in popup
+        function showCredential(url) {
+            // Create overlay
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.9);
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            `;
+            
+            // Create image container
+            const container = document.createElement('div');
+            container.style.cssText = `
+                max-width: 90%;
+                max-height: 90%;
+                position: relative;
+            `;
+            
+            // Create close button
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '✕';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: -40px;
+                right: -40px;
+                background: #dc2626;
+                color: white;
+                border: none;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                font-size: 20px;
+                cursor: pointer;
+                z-index: 1001;
+            `;
+            
+            // Create image
+            const img = document.createElement('img');
+            img.src = url;
+            img.style.cssText = `
+                max-width: 100%;
+                max-height: 80vh;
+                border-radius: 10px;
+                box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            `;
+            
+            // Add elements
+            container.appendChild(closeBtn);
+            container.appendChild(img);
+            overlay.appendChild(container);
+            document.body.appendChild(overlay);
+            
+            // Click to close
+            overlay.addEventListener('click', function() {
+                document.body.removeChild(overlay);
+            });
+            
+            closeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.body.removeChild(overlay);
+            });
+        }
     </script>
 </body>
 </html>
