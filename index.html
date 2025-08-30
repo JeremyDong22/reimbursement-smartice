@@ -1015,7 +1015,7 @@
             Object.keys(categories).sort().forEach((category, index) => {
                 // Category header with data attribute for category identification
                 const safeCategoryId = category.replace(/[^a-zA-Z0-9]/g, '-');
-                html += `<tr class="category-header" data-category-id="${safeCategoryId}"><td colspan="8">${category}</td></tr>`;
+                html += `<tr class="category-header" data-category-id="${safeCategoryId}"><td colspan="9">${category}</td></tr>`;
 
                 let categoryTotal = 0;
                 
@@ -1052,8 +1052,7 @@
                     <tr class="subtotal ${safeCategoryId}">
                         <td colspan="6">Category Subtotal</td>
                         <td class="amount">${categoryTotal.toFixed(2)}</td>
-                        <td></td>
-                        <td></td>
+                        <td colspan="2"></td>
                     </tr>
                 `;
             });
@@ -1064,8 +1063,7 @@
                     <tr class="grand-total">
                         <td colspan="6">TOTAL REIMBURSEMENT AMOUNT</td>
                         <td class="amount" style="font-size: 18px;">¥${grandTotal.toFixed(2)}</td>
-                        <td></td>
-                        <td></td>
+                        <td colspan="2"></td>
                     </tr>
                 </tbody>
             </table>`;
@@ -1126,7 +1124,7 @@
 
             Object.keys(paymentCycles).forEach((paidDate, index) => {
                 const safeCycleId = `cycle-${index}`;
-                html += `<tr><td colspan="7" class="payment-cycle-header" data-cycle-id="${safeCycleId}">💰 Paid on: ${paidDate}</td></tr>`;
+                html += `<tr><td colspan="8" class="payment-cycle-header" data-cycle-id="${safeCycleId}">💰 Paid on: ${paidDate}</td></tr>`;
 
                 let cycleTotal = 0;
                 
@@ -1151,8 +1149,7 @@
                     <tr class="subtotal ${safeCycleId}">
                         <td colspan="5">Cycle Total</td>
                         <td class="amount">¥${cycleTotal.toFixed(2)}</td>
-                        <td></td>
-                        <td></td>
+                        <td colspan="2"></td>
                     </tr>
                 `;
             });
@@ -1322,7 +1319,7 @@
                 <button class="save-btn" onclick="saveEdit(${id})">Save</button>
                 <button class="cancel-btn" onclick="cancelEdit(${id})">Cancel</button>
                 <button class="delete-btn" onclick="deleteExpense(${id})">Delete</button>
-                <label for="upload-credential-${id}" style="background: #10b981; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px;">📎 Upload</label>
+                <label for="upload-credential-${id}" style="background: #10b981; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px;">Upload</label>
                 <input type="file" id="upload-credential-${id}" accept="image/*,.pdf" style="display: none;" onchange="uploadCredentialForExpense(${id})">
             `;
             
