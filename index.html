@@ -281,6 +281,28 @@
             background: #2e7dd2;
         }
         
+        .action-btn-group {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .action-btn {
+            min-width: 60px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border: none;
+            color: white;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
         .delete-btn {
             background: #dc2626;
             color: white;
@@ -298,34 +320,60 @@
         
         .save-btn {
             background: #4caf50;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background 0.2s;
-            margin-right: 5px;
         }
         
         .save-btn:hover {
             background: #45a049;
+            transform: translateY(-1px);
         }
         
         .cancel-btn {
             background: #666;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background 0.2s;
-            margin-right: 5px;
         }
         
         .cancel-btn:hover {
             background: #555;
+            transform: translateY(-1px);
+        }
+        
+        .delete-btn.action-btn {
+            background: #dc2626;
+        }
+        
+        .delete-btn.action-btn:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
+        }
+        
+        .upload-btn {
+            background: #10b981;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-btn:hover:not(:disabled) {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+        
+        .upload-btn.uploading {
+            background: #6b7280;
+            cursor: not-allowed;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .upload-btn.uploaded {
+            background: #10b981;
+        }
+        
+        .upload-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
         
         .edit-input {
@@ -664,9 +712,15 @@
                 grid-template-columns: 1fr;
             }
             
-            .edit-btn, .delete-btn, .save-btn, .cancel-btn {
-                padding: 4px 8px;
-                font-size: 11px;
+            .action-btn-group {
+                flex-direction: column;
+                gap: 2px;
+            }
+            
+            .action-btn {
+                min-width: 100%;
+                font-size: 10px;
+                padding: 4px 6px;
             }
             
             .edit-input, .edit-select {
@@ -871,16 +925,115 @@
             loadCurrentExpenses();
             loadHistoryExpenses();
             
-            // Register service worker for PWA
+            // Register service worker for PWA with update detection
             if ('serviceWorker' in navigator) {
+                let refreshing = false;
+                
+                // Listen for controller change (new service worker activated)
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        window.location.reload();
+                        refreshing = true;
+                    }
+                });
+                
                 navigator.serviceWorker.register('/service-worker.js')
                     .then(registration => {
                         console.log('Service Worker registered:', registration);
+                        
+                        // Check for updates immediately
+                        registration.update();
+                        
+                        // Check for updates every 30 minutes
+                        setInterval(() => {
+                            registration.update();
+                        }, 30 * 60 * 1000);
+                        
+                        // Handle waiting service worker
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // New service worker is waiting
+                                    showUpdateNotification(registration);
+                                }
+                            });
+                        });
+                        
+                        // Check if there's already a waiting service worker
+                        if (registration.waiting) {
+                            showUpdateNotification(registration);
+                        }
                     })
                     .catch(error => {
                         console.log('Service Worker registration failed:', error);
                     });
             }
+            
+            // Show update notification with refresh button
+            function showUpdateNotification(registration) {
+                const updateBanner = document.createElement('div');
+                updateBanner.id = 'update-banner';
+                updateBanner.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    z-index: 9999;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    animation: slideUp 0.3s ease-out;
+                `;
+                
+                updateBanner.innerHTML = `
+                    <span>🔄 New version available!</span>
+                    <button onclick="updateApp()" style="
+                        background: white;
+                        color: #667eea;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 5px;
+                        font-weight: bold;
+                        cursor: pointer;
+                    ">Update Now</button>
+                    <button onclick="dismissUpdate()" style="
+                        background: transparent;
+                        color: white;
+                        border: 1px solid white;
+                        padding: 8px 16px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                    ">Later</button>
+                `;
+                
+                document.body.appendChild(updateBanner);
+                
+                // Store registration globally for update function
+                window.serviceWorkerRegistration = registration;
+            }
+            
+            // Update the app
+            window.updateApp = function() {
+                if (window.serviceWorkerRegistration && window.serviceWorkerRegistration.waiting) {
+                    // Tell waiting service worker to take control
+                    window.serviceWorkerRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+            };
+            
+            // Dismiss update notification
+            window.dismissUpdate = function() {
+                const banner = document.getElementById('update-banner');
+                if (banner) {
+                    banner.remove();
+                }
+            };
             
             // Handle PWA install prompt
             let deferredPrompt;
@@ -1314,14 +1467,57 @@
             const row = document.getElementById(`row-${id}`);
             const expenseData = JSON.parse(row.dataset.expense);
             
-            // Replace action buttons
-            document.getElementById(`actions-${id}`).innerHTML = `
-                <button class="save-btn" onclick="saveEdit(${id})">Save</button>
-                <button class="cancel-btn" onclick="cancelEdit(${id})">Cancel</button>
-                <button class="delete-btn" onclick="deleteExpense(${id})">Delete</button>
-                <label for="upload-credential-${id}" style="background: #10b981; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px;">Upload</label>
-                <input type="file" id="upload-credential-${id}" accept="image/*,.pdf" style="display: none;" onchange="uploadCredentialForExpense(${id})">
-            `;
+            // Clear and rebuild action buttons with better design
+            const actionsCell = document.getElementById(`actions-${id}`);
+            actionsCell.innerHTML = '';
+            
+            // Create button group container
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'action-btn-group';
+            
+            // Create Save button
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'action-btn save-btn';
+            saveBtn.textContent = 'Save';
+            saveBtn.onclick = () => saveEdit(id);
+            btnGroup.appendChild(saveBtn);
+            
+            // Create Cancel button
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'action-btn cancel-btn';
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.onclick = () => cancelEdit(id);
+            btnGroup.appendChild(cancelBtn);
+            
+            // Create Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'action-btn delete-btn';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = () => deleteExpense(id);
+            btnGroup.appendChild(deleteBtn);
+            
+            // Create Upload button (not a label anymore)
+            const uploadBtn = document.createElement('button');
+            uploadBtn.className = 'action-btn upload-btn';
+            uploadBtn.id = `upload-btn-${id}`;
+            // Check if credential already exists
+            uploadBtn.textContent = expenseData.credential_url ? 'Replace' : 'Upload';
+            uploadBtn.onclick = () => {
+                // Trigger the hidden file input
+                document.getElementById(`upload-credential-${id}`).click();
+            };
+            btnGroup.appendChild(uploadBtn);
+            
+            // Create hidden file input
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.id = `upload-credential-${id}`;
+            fileInput.accept = 'image/*,.pdf';
+            fileInput.style.display = 'none';
+            fileInput.onchange = () => uploadCredentialForExpense(id);
+            btnGroup.appendChild(fileInput);
+            
+            actionsCell.appendChild(btnGroup);
             
             // Make fields editable
             document.getElementById(`name-${id}`).innerHTML = `
@@ -1395,25 +1591,62 @@
             }
         }
         
-        // Delete expense
+        // Delete expense - Updated to use user-specific passwords from database
         async function deleteExpense(id) {
-            const passcode = prompt('Enter passcode to delete:');
-            if (passcode !== '9633') {
-                alert('Incorrect passcode');
-                return;
-            }
-
+            const passcode = prompt('Enter your password to delete this item:');
+            if (!passcode) return;
+            
+            // Get the current username
+            const currentUsername = localStorage.getItem('payoff_username');
+            
             try {
-                const { error } = await supabase
+                // First, try to verify the password using the RPC function if it exists
+                const { data: verifyResult, error: verifyError } = await supabase
+                    .rpc('verify_user_password', {
+                        p_username: currentUsername,
+                        p_password: passcode
+                    }).single();
+                
+                let passwordCorrect = false;
+                
+                if (verifyError) {
+                    // If RPC function doesn't exist, fall back to hardcoded logic
+                    // This matches the login authentication pattern
+                    if (currentUsername === 'Jeremy' && passcode === '9633') {
+                        // Jeremy uses his special 4-digit code
+                        passwordCorrect = true;
+                    } else if (currentUsername === 'Jeremy' && passcode === 'Jeremy123') {
+                        // Jeremy can also use the standard pattern
+                        passwordCorrect = true;
+                    } else if (currentUsername === 'Hengwu' && passcode === 'Hengwu123') {
+                        // Hengwu uses name + 123 pattern
+                        passwordCorrect = true;
+                    } else if (passcode === currentUsername + '123') {
+                        // Other users follow the username + 123 pattern
+                        passwordCorrect = true;
+                    }
+                } else {
+                    // RPC function succeeded, use its result
+                    passwordCorrect = verifyResult === true;
+                }
+                
+                if (!passwordCorrect) {
+                    alert('Incorrect password. Please enter your user-specific password.');
+                    return;
+                }
+
+                // Password verified, proceed with deletion
+                const { error: deleteError } = await supabase
                     .from('payoff_reimbursements')
                     .delete()
                     .eq('id', id)
                     .eq('user_id', currentUserId);
 
-                if (error) throw error;
+                if (deleteError) throw deleteError;
 
                 editingId = null;
                 loadCurrentExpenses();
+                
             } catch (error) {
                 alert('Error deleting expense: ' + error.message);
             }
@@ -1557,8 +1790,19 @@
         
         // Refresh page function
         function refreshPage() {
-            console.log('Refreshing data...');
-            showNotification('Refreshing...', 'info');
+            console.log('Refreshing data and checking for updates...');
+            showNotification('Refreshing & checking for updates...', 'info');
+            
+            // Check for PWA updates
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.getRegistration().then(registration => {
+                    if (registration) {
+                        registration.update().then(() => {
+                            console.log('Checked for service worker updates');
+                        });
+                    }
+                });
+            }
             
             // Reload all data
             Promise.all([
@@ -1621,6 +1865,10 @@
                 from { transform: translateX(0); opacity: 1; }
                 to { transform: translateX(100%); opacity: 0; }
             }
+            @keyframes slideUp {
+                from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+                to { transform: translateX(-50%) translateY(0); opacity: 1; }
+            }
         `;
         document.head.appendChild(style);
         
@@ -1634,17 +1882,28 @@
             window.location.href = 'login.html';
         }
         
-        // Upload credential for existing expense
+        // Upload credential for existing expense with status feedback
         async function uploadCredentialForExpense(id) {
             const fileInput = document.getElementById(`upload-credential-${id}`);
             const file = fileInput.files[0];
+            const uploadBtn = document.getElementById(`upload-btn-${id}`);
             
             if (!file) return;
             
             if (file.size > 5 * 1024 * 1024) {
                 alert('File size must be less than 5MB');
+                fileInput.value = ''; // Clear the file input
                 return;
             }
+            
+            // Store original button state
+            const originalText = uploadBtn.textContent;
+            const originalClass = uploadBtn.className;
+            
+            // Set uploading state
+            uploadBtn.textContent = 'Uploading...';
+            uploadBtn.className = 'action-btn upload-btn uploading';
+            uploadBtn.disabled = true;
             
             try {
                 const fileExt = file.name.split('.').pop();
@@ -1677,7 +1936,11 @@
                     throw new Error('Failed to update expense with credential');
                 }
                 
-                // Update the UI
+                // Success - update button state
+                uploadBtn.textContent = 'Uploaded ✓';
+                uploadBtn.className = 'action-btn upload-btn uploaded';
+                
+                // Update the credential cell
                 const credentialCell = document.getElementById(`credential-${id}`);
                 if (credentialCell) {
                     credentialCell.innerHTML = `<a href="#" onclick="showCredential('${publicUrl}'); return false;" style="color: #4a9eff; text-decoration: none;">📎 View</a>`;
@@ -1685,9 +1948,25 @@
                 
                 showNotification('Credential uploaded successfully!', 'success');
                 
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    uploadBtn.textContent = 'Replace';
+                    uploadBtn.className = 'action-btn upload-btn';
+                    uploadBtn.disabled = false;
+                }, 3000);
+                
             } catch (error) {
                 console.error('Error uploading credential:', error);
+                
+                // Reset button to original state on error
+                uploadBtn.textContent = originalText;
+                uploadBtn.className = originalClass;
+                uploadBtn.disabled = false;
+                
                 alert('Error uploading credential: ' + error.message);
+            } finally {
+                // Clear the file input for next use
+                fileInput.value = '';
             }
         }
         

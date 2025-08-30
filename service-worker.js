@@ -1,5 +1,7 @@
-// PWA Service Worker - Handles offline functionality and caching
-const CACHE_NAME = 'reimbursement-tracker-v1';
+// PWA Service Worker - Handles offline functionality, caching, and update detection
+// Version: 1.0.1 - Update this when deploying new versions
+const VERSION = '1.0.1';
+const CACHE_NAME = `reimbursement-tracker-v${VERSION}`;
 const urlsToCache = [
   '/',
   '/index.html',
@@ -105,6 +107,17 @@ self.addEventListener('fetch', event => {
         }
       })
   );
+});
+
+// Handle messages from clients
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  
+  if (event.data && event.data.type === 'GET_VERSION') {
+    event.ports[0].postMessage({ version: VERSION });
+  }
 });
 
 // Background sync for offline expense submission
